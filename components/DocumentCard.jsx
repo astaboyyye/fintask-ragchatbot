@@ -9,7 +9,7 @@ const STATUS_LABEL = {
 };
 
 export default function DocumentCard({ document: doc, onDelete, onRetry }) {
-  const ready = doc.status === "READY";
+  const ready = doc.status === "READY" && !doc.needsReindex;
   return (
     <article className="doc-card">
       <div className="doc-card-head">
@@ -19,17 +19,20 @@ export default function DocumentCard({ document: doc, onDelete, onRetry }) {
       <h3 className="doc-title" title={doc.title}>{doc.title}</h3>
       <p className="doc-meta">
         {doc.pageCount} {doc.pageCount === 1 ? "page" : "pages"} · {formatBytes(doc.fileSize)}
-        {ready && <> · {doc.chunkCount} chunks</>}
+        {doc.status === "READY" && <> · {doc.chunkCount} chunks</>}
       </p>
       <p className="doc-meta subtle">Added {formatDate(doc.createdAt)}</p>
       {doc.status === "FAILED" && doc.error && <p className="form-error small">{doc.error}</p>}
+      {doc.needsReindex && (
+        <p className="note small">Indexed with an older embedding model. Re-index it to chat.</p>
+      )}
       <div className="doc-actions">
         {ready ? (
           <Link href={`/chat/${doc.id}`} className="btn btn-primary btn-sm">Open chat</Link>
         ) : (
           onRetry && doc.status !== "PROCESSING" && (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => onRetry(doc)}>
-              Process
+              {doc.needsReindex ? "Re-index" : "Process"}
             </button>
           )
         )}

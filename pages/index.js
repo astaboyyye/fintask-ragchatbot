@@ -70,7 +70,7 @@ export default function HomePage() {
         <h1>Ask questions about any PDF.</h1>
         <p className="lede">
           Upload a document and DocQuery splits it into passages, embeds them into a vector database,
-          and answers your questions with Claude, citing the pages each answer came from.
+          and answers your questions with an LLM, citing the pages each answer came from.
         </p>
       </section>
 
@@ -108,9 +108,9 @@ export default function HomePage() {
       <section className="concepts">
         {[
           ["Chunking", "500-token windows with 50 tokens of overlap, so a sentence cut at a boundary still appears whole in one chunk."],
-          ["Embeddings", "Each chunk becomes a 1536-dimension vector with OpenAI text-embedding-3-small, stored in Postgres with pgvector."],
-          ["Retrieval", "Your question is embedded the same way, and the 5 chunks closest by cosine similarity become Claude's context."],
-          ["Grounded answers", "Claude streams its answer over Server-Sent Events and cites the passages it used, with page numbers."],
+          ["Embeddings", "Each chunk becomes a 1536-dimension embedding vector, stored in Postgres with pgvector."],
+          ["Retrieval", "Your question is embedded the same way, and the 5 chunks closest by cosine similarity become the model's context."],
+          ["Grounded answers", "The model streams its answer over Server-Sent Events and cites the passages it used, with page numbers."],
         ].map(([title, text]) => (
           <div key={title} className="concept">
             <h3>{title}</h3>

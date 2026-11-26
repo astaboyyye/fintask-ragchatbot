@@ -1,6 +1,7 @@
 import { prisma } from "../../../lib/db";
 import { getOwner } from "../../../lib/owner";
-import { allowMethods, publicDocumentSelect } from "../../../lib/api";
+import { allowMethods, publicDocumentSelect, withIndexState } from "../../../lib/api";
+import { EMBEDDING_MODEL } from "../../../lib/embedder";
 
 /** GET: the current visitor's documents, newest first. */
 export default async function handler(req, res) {
@@ -12,5 +13,5 @@ export default async function handler(req, res) {
     take: 100,
     select: publicDocumentSelect,
   });
-  res.status(200).json({ documents });
+  res.status(200).json({ documents: documents.map((d) => withIndexState(d, EMBEDDING_MODEL)) });
 }

@@ -31,7 +31,7 @@ export default function DocumentsPage() {
 
   async function retry(doc) {
     setError("");
-    setDocs((d) => d.map((x) => (x.id === doc.id ? { ...x, status: "PROCESSING", error: null } : x)));
+    setDocs((d) => d.map((x) => (x.id === doc.id ? { ...x, status: "PROCESSING", error: null, needsReindex: false } : x)));
     try {
       await fetchJSON("/api/process", { method: "POST", body: JSON.stringify({ documentId: doc.id }) });
     } catch (e) {

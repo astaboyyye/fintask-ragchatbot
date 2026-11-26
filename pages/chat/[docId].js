@@ -79,7 +79,7 @@ export default function ChatDocPage() {
           } else if (event === "reset") {
             updateLast((m) => ({ ...m, content: "" }));
           } else if (event === "done") {
-            updateLast((m) => ({ ...m, id: data.messageId, streaming: false }));
+            updateLast((m) => ({ ...m, id: data.messageId, model: data.model, streaming: false }));
           } else if (event === "error") {
             updateLast((m) => ({ ...m, streaming: false, error: data.message }));
           }
@@ -118,7 +118,7 @@ export default function ChatDocPage() {
     );
   }
 
-  const ready = doc?.status === "READY";
+  const ready = doc?.status === "READY" && !doc?.needsReindex;
 
   return (
     <Layout title={doc?.title || "Chat"} wide>
@@ -139,7 +139,11 @@ export default function ChatDocPage() {
 
           <div className="chat-scroll">
             {doc && !ready && (
-              <p className="form-error">This document isn't ready ({doc.status.toLowerCase()}). Process it from the Documents page.</p>
+              <p className="form-error">
+                {doc.needsReindex
+                  ? "This document was indexed with a different embedding model. Re-index it from the Documents page."
+                  : `This document isn't ready (${doc.status.toLowerCase()}). Process it from the Documents page.`}
+              </p>
             )}
             {ready && messages.length === 0 && (
               <div className="chat-empty">
@@ -159,6 +163,7 @@ export default function ChatDocPage() {
                   content={m.content}
                   sources={m.sources}
                   streaming={m.streaming}
+                  model={m.model}
                   activeCite={focusIdx === i ? focus.cite : null}
                   onCite={(n) => setFocus({ msg: i, cite: n })}
                 />

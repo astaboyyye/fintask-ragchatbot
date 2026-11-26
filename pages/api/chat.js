@@ -1,6 +1,7 @@
 import { prisma } from "../../lib/db";
 import { searchChunks, TOP_K } from "../../lib/vectorSearch";
-import { streamAnswer, describeClaudeError, CLAUDE_MODEL } from "../../lib/claudeRAG";
+import { streamAnswer, describeClaudeError, isRetryableModelError, ANSWER_MODELS } from "../../lib/claudeRAG";
+import { EMBEDDING_MODEL } from "../../lib/embedder";
 import { getOwner } from "../../lib/owner";
 import { allowMethods, sendError } from "../../lib/api";
 
@@ -10,12 +11,14 @@ const MAX_QUESTION_CHARS = 2000;
 
 /**
  * Steps 6-7 of the pipeline: embed the question, find the top-5 chunks by cosine
- * similarity, and stream Claude's answer back as Server-Sent Events.
+ * similarity, and stream the model's answer back as Server-Sent Events.
+ * If a model is rate-limited or unavailable before it has written anything, the
+ * next model in ANSWER_MODELS is tried.
  *
  * POST { documentId, question }
  * Events:  sources -> [{ n, id, index, pageStart, pageEnd, similarity, content }]
  *          delta   -> { text }          (answer text, streamed)
- *          reset   -> {}                (discard partial text: a fallback model took over)
+ *          reset   -> {}                (discard partial text: another model took over)
  *          done    -> { messageId, model, stopReason }
  *          error   -> { message }
  */
@@ -33,10 +36,14 @@ export default async function handler(req, res) {
 
   const doc = await prisma.document.findFirst({
     where: { id: documentId, ownerId: owner.id },
-    select: { id: true, title: true, status: true },
+    select: { id: true, title: true, status: true, embeddingModel: true },
   });
   if (!doc) return sendError(res, 404, "Document not found.");
   if (doc.status !== "READY") return sendError(res, 409, "This document hasn't finished processing yet.");
+  // Vectors from different embedding models aren't comparable.
+  if (doc.embeddingModel !== EMBEDDING_MODEL) {
+    return sendError(res, 409, "This document was indexed with a different embedding model. Re-index it from the Documents page.");
+  }
 
   // Open the SSE stream.
   res.writeHead(200, {
@@ -79,20 +86,35 @@ export default async function handler(req, res) {
     }));
     send("sources", sources);
 
-    // Generate
-    stream = streamAnswer({ question, chunks, history, documentTitle: doc.title });
+    // Generate, moving to the next model if one is rate-limited or down.
     let answer = "";
-    for await (const event of stream) {
-      if (event.type === "content_block_start" && event.content_block?.type === "fallback") {
-        // The primary model declined mid-answer and a fallback model restarts the reply.
-        answer = "";
-        send("reset", {});
-      } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-        answer += event.delta.text;
-        send("delta", { text: event.delta.text });
+    let final;
+    let usedModel;
+    for (let attempt = 0; attempt < ANSWER_MODELS.length; attempt++) {
+      usedModel = ANSWER_MODELS[attempt];
+      stream = streamAnswer({ question, chunks, history, documentTitle: doc.title, model: usedModel });
+      try {
+        for await (const event of stream) {
+          if (event.type === "content_block_start" && event.content_block?.type === "fallback") {
+            // The primary model declined mid-answer and a fallback model restarts the reply.
+            answer = "";
+            send("reset", {});
+          } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            answer += event.delta.text;
+            send("delta", { text: event.delta.text });
+          }
+        }
+        final = await stream.finalMessage();
+        break;
+      } catch (err) {
+        const canFailOver = !answer && !clientGone && attempt < ANSWER_MODELS.length - 1;
+        if (!canFailOver || !isRetryableModelError(err)) throw err;
+        console.warn(`Model ${usedModel} unavailable (${err.status ?? err.name}); trying the next one.`);
       }
     }
-    const final = await stream.finalMessage();
+    if (!answer.trim() && final.stop_reason !== "refusal") {
+      throw new Error("The model returned an empty answer. Try asking again.");
+    }
 
     if (final.stop_reason === "refusal") {
       answer = "I can't help with that request.";
@@ -107,11 +129,11 @@ export default async function handler(req, res) {
     const [, saved] = await prisma.$transaction([
       prisma.chatMessage.create({ data: { documentId: doc.id, role: "user", content: question } }),
       prisma.chatMessage.create({
-        data: { documentId: doc.id, role: "assistant", content: answer, sources },
+        data: { documentId: doc.id, role: "assistant", content: answer, sources, model: final.model || usedModel },
       }),
     ]);
 
-    send("done", { messageId: saved.id, model: final.model || CLAUDE_MODEL, stopReason: final.stop_reason });
+    send("done", { messageId: saved.id, model: final.model || usedModel, stopReason: final.stop_reason });
   } catch (err) {
     if (!clientGone) {
       console.error("Chat failed", err);

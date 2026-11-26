@@ -1,6 +1,7 @@
 import { prisma } from "../../../lib/db";
 import { getOwner } from "../../../lib/owner";
-import { allowMethods, publicDocumentSelect, sendError } from "../../../lib/api";
+import { allowMethods, publicDocumentSelect, sendError, withIndexState } from "../../../lib/api";
+import { EMBEDDING_MODEL } from "../../../lib/embedder";
 
 /**
  * GET:    one document plus its chat history.
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
   const messages = await prisma.chatMessage.findMany({
     where: { documentId: doc.id },
     orderBy: { createdAt: "asc" },
-    select: { id: true, role: true, content: true, sources: true, createdAt: true },
+    select: { id: true, role: true, content: true, sources: true, model: true, createdAt: true },
   });
-  res.status(200).json({ document: doc, messages });
+  res.status(200).json({ document: withIndexState(doc, EMBEDDING_MODEL), messages });
 }

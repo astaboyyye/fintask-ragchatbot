@@ -2,10 +2,10 @@ export const PIPELINE = [
   { key: "upload", label: "PDF uploaded", detail: "multipart upload" },
   { key: "extract", label: "Text extracted", detail: "pdf-parse" },
   { key: "chunk", label: "Chunked", detail: "500 tokens · 50 overlap" },
-  { key: "embed", label: "Embedded", detail: "text-embedding-3-small" },
+  { key: "embed", label: "Embedded", detail: "1536-dim vectors" },
   { key: "store", label: "Stored", detail: "pgvector" },
   { key: "search", label: "Searched", detail: "cosine · top 5" },
-  { key: "answer", label: "Answered", detail: "Claude + context" },
+  { key: "answer", label: "Answered", detail: "LLM + context" },
 ];
 
 /**

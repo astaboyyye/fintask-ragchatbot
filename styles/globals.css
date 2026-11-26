@@ -285,3 +285,7 @@ button, textarea, input { font: inherit; color: inherit; }
   .chat-head .pipeline-compact { display: none; }
   .msg-body { max-width: 100%; }
 }
+
+.msg-model { margin: 8px 0 0; font-size: 11.5px; color: var(--muted); }
+.note { margin: 4px 0 0; color: #8a6500; background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; }
+@media (prefers-color-scheme: dark) { .note { color: var(--accent); } }

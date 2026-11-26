@@ -22,30 +22,31 @@ enum DocStatus {
 }
 
 model Document {
-  id         String        @id @default(cuid())
-  ownerId    String // NextAuth user id, or an anonymous browser id cookie
-  title      String
-  fileName   String
-  fileSize   Int
-  pageCount  Int
-  charCount  Int
-  pages      Json // string[]: extracted text for each page (1-indexed by position)
-  status     DocStatus     @default(UPLOADED)
-  error      String?
-  chunkCount Int           @default(0)
-  tokenCount Int           @default(0)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  chunks     Chunk[]
-  messages   ChatMessage[]
+  id             String        @id @default(cuid())
+  ownerId        String // NextAuth user id, or an anonymous browser id cookie
+  title          String
+  fileName       String
+  fileSize       Int
+  pageCount      Int
+  charCount      Int
+  pages          Json // string[]: extracted text for each page (1-indexed by position)
+  status         DocStatus     @default(UPLOADED)
+  error          String?
+  chunkCount     Int           @default(0)
+  tokenCount     Int           @default(0)
+  embeddingModel String? // model that produced the stored vectors
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  chunks         Chunk[]
+  messages       ChatMessage[]
 
   @@index([ownerId, createdAt])
 }
 
 model Chunk {
-  id         String                      @id
+  id         String                       @id
   documentId String
-  document   Document                    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
   index      Int
   content    String
   tokenCount Int
@@ -63,6 +64,7 @@ model ChatMessage {
   role       String // "user" | "assistant"
   content    String
   sources    Json? // retrieved chunks used for an assistant answer
+  model      String? // model that wrote an assistant answer
   createdAt  DateTime @default(now())
 
   @@index([documentId, createdAt])

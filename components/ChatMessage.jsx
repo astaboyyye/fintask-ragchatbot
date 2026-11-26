@@ -9,7 +9,12 @@ function linkCitations(text, sourceCount) {
   );
 }
 
-export default function ChatMessage({ role, content, sources = [], streaming = false, onCite, activeCite }) {
+// "nvidia/nemotron-3-ultra-550b-a55b:free" -> "nemotron-3-ultra-550b-a55b"
+function shortModel(model) {
+  return model.split("/").pop().replace(/:free$/, "");
+}
+
+export default function ChatMessage({ role, content, sources = [], streaming = false, model, onCite, activeCite }) {
   if (role === "user") {
     return (
       <div className="msg msg-user">
@@ -70,6 +75,7 @@ export default function ChatMessage({ role, content, sources = [], streaming = f
             ))}
           </div>
         )}
+        {model && !streaming && <p className="msg-model">Answered by {shortModel(model)}</p>}
       </div>
     </div>
   );

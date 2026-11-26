@@ -62,6 +62,7 @@ export default async function handler(req, res) {
       where: { id: doc.id },
       data: {
         status: "READY",
+        embeddingModel: EMBEDDING_MODEL,
         chunkCount: chunks.length,
         tokenCount: chunks.reduce((n, c) => n + c.tokenCount, 0),
       },
