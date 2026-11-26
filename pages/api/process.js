@@ -88,7 +88,9 @@ export default async function handler(req, res) {
         ? "The embeddings API key is invalid."
         : err?.status === 402
           ? "The AI provider account is out of credits. Add credits and try again."
-          : "Processing failed while creating embeddings. Try again.";
+          : err?.status === 429
+            ? "The embedding model is rate-limited right now (free models have a daily request limit). Try again later."
+            : "Processing failed while creating embeddings. Try again.";
     await prisma.document
       .update({ where: { id: doc.id }, data: { status: "FAILED", error: message } })
       .catch(() => {});

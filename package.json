@@ -1,5 +1,5 @@
 {
-  "name": "rag-chatbot",
+  "name": "fintask-ragchatbot",
   "version": "1.0.0",
   "private": true,
   "description": "AI chatbot with document RAG: PDF upload, pgvector search, Claude answers with source citations",
@@ -14,7 +14,7 @@
     "postinstall": "prisma generate"
   },
   "engines": {
-    "node": ">=20.16"
+    "node": "24.x"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.7.0",

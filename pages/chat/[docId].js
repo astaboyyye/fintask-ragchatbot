@@ -134,7 +134,10 @@ export default function ChatDocPage() {
                 </p>
               )}
             </div>
-            <PipelineSteps compact active={phase === -1 ? (ready ? 5 : 0) : phase} />
+            <PipelineSteps
+              compact
+              active={phase !== -1 ? phase : !ready ? 0 : messages.some((m) => m.role === "assistant" && m.content) ? 7 : 5}
+            />
           </header>
 
           <div className="chat-scroll">

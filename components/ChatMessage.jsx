@@ -1,18 +1,7 @@
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { pageLabel } from "../lib/client";
-
-// Turn "[2]" citations into links we can render as clickable badges.
-function linkCitations(text, sourceCount) {
-  return text.replace(/\[(\d{1,2})\](?!\()/g, (match, n) =>
-    Number(n) >= 1 && Number(n) <= sourceCount ? `[${n}](#cite-${n})` : match
-  );
-}
-
-// "nvidia/nemotron-3-ultra-550b-a55b:free" -> "nemotron-3-ultra-550b-a55b"
-function shortModel(model) {
-  return model.split("/").pop().replace(/:free$/, "");
-}
+import { linkCitations, shortModel } from "../lib/citations";
 
 export default function ChatMessage({ role, content, sources = [], streaming = false, model, onCite, activeCite }) {
   if (role === "user") {
@@ -55,12 +44,12 @@ export default function ChatMessage({ role, content, sources = [], streaming = f
             </Markdown>
             {streaming && <span className="caret" aria-hidden />}
           </div>
-        ) : (
+        ) : streaming ? (
           <div className="thinking" aria-live="polite">
             <span /><span /><span />
             <em>{sources.length ? "Writing answer" : "Searching the document"}</em>
           </div>
-        )}
+        ) : null}
         {sources.length > 0 && !streaming && (
           <div className="msg-sources">
             {sources.map((s) => (
