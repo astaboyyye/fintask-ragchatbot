@@ -1,5 +1,5 @@
-import { authEnabled } from "../../lib/auth";
-import { getOwner } from "../../lib/owner";
+import { authEnabled } from "../../utils/auth";
+import { getOwner } from "../../utils/owner";
 
 /** Tells the UI whether GitHub sign-in is available and who is signed in. */
 export default async function handler(req, res) {

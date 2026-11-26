@@ -27,6 +27,7 @@ model Document {
   title          String
   fileName       String
   fileSize       Int
+  contentHash    String? // SHA-256 of the PDF, to reuse embeddings on re-upload
   pageCount      Int
   charCount      Int
   pages          Json // string[]: extracted text for each page (1-indexed by position)
@@ -41,6 +42,7 @@ model Document {
   messages       ChatMessage[]
 
   @@index([ownerId, createdAt])
+  @@index([ownerId, contentHash])
 }
 
 model Chunk {

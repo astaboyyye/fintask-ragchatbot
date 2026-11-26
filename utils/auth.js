@@ -2,7 +2,7 @@ import GitHubProvider from "next-auth/providers/github";
 
 // Sign-in is optional. With GITHUB_ID / GITHUB_SECRET / NEXTAUTH_SECRET set,
 // users can sign in with GitHub and their documents follow their account.
-// Without them, each browser gets a private anonymous workspace (lib/owner.js).
+// Without them, each browser gets a private anonymous workspace (utils/owner.js).
 export const authEnabled = Boolean(
   process.env.GITHUB_ID && process.env.GITHUB_SECRET && process.env.NEXTAUTH_SECRET
 );

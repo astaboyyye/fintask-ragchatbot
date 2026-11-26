@@ -1,6 +1,6 @@
 import { prisma } from "../../../lib/db";
-import { getOwner } from "../../../lib/owner";
-import { allowMethods, publicDocumentSelect, withIndexState } from "../../../lib/api";
+import { getOwner } from "../../../utils/owner";
+import { allowMethods, publicDocumentSelect, withIndexState } from "../../../utils/api";
 import { EMBEDDING_MODEL } from "../../../lib/embedder";
 
 /** GET: the current visitor's documents, newest first. */

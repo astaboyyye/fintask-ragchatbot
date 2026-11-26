@@ -1,9 +1,16 @@
 import { prisma } from "../../lib/db";
-import { searchChunks, TOP_K } from "../../lib/vectorSearch";
-import { streamAnswer, describeClaudeError, isRetryableModelError, ANSWER_MODELS } from "../../lib/claudeRAG";
+import { searchChunks, retrievalQuery, TOP_K, MIN_SIMILARITY } from "../../lib/vectorSearch";
+import {
+  streamAnswer,
+  selectContext,
+  describeClaudeError,
+  isRetryableModelError,
+  ANSWER_MODELS,
+} from "../../lib/claudeRAG";
+import { openEventStream } from "../../lib/sse";
 import { EMBEDDING_MODEL } from "../../lib/embedder";
-import { getOwner } from "../../lib/owner";
-import { allowMethods, sendError } from "../../lib/api";
+import { getOwner } from "../../utils/owner";
+import { allowMethods, sendError } from "../../utils/api";
 
 export const config = { maxDuration: 120 };
 
@@ -45,17 +52,7 @@ export default async function handler(req, res) {
     return sendError(res, 409, "This document was indexed with a different embedding model. Re-index it from the Documents page.");
   }
 
-  // Open the SSE stream.
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache, no-transform",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-  res.flushHeaders?.();
-  const send = (event, data) => {
-    if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-  };
+  const send = openEventStream(res);
 
   let stream;
   let clientGone = false;
@@ -73,8 +70,11 @@ export default async function handler(req, res) {
     });
     history.reverse();
 
-    // Retrieve
-    const chunks = await searchChunks(doc.id, question, TOP_K);
+    // Retrieve: top 5 by cosine similarity, then drop weak matches and cap the
+    // total context size.
+    const previousQuestion = [...history].reverse().find((m) => m.role === "user")?.content;
+    const ranked = await searchChunks(doc.id, retrievalQuery(question, previousQuestion), TOP_K);
+    const chunks = selectContext(ranked, { minSimilarity: MIN_SIMILARITY });
     const sources = chunks.map((c, i) => ({
       n: i + 1,
       id: c.id,
@@ -85,6 +85,22 @@ export default async function handler(req, res) {
       content: c.content,
     }));
     send("sources", sources);
+
+    if (!chunks.length) {
+      // Nothing relevant enough: say so rather than let the model improvise.
+      const best = ranked[0]?.similarity ?? 0;
+      const answer =
+        "I couldn't find passages in this document that are relevant to that question " +
+        `(best match: ${best.toFixed(2)} cosine similarity, below the ${MIN_SIMILARITY} threshold), ` +
+        "so I won't guess. Try rephrasing, or ask about something the document covers.";
+      send("delta", { text: answer });
+      const [, saved] = await prisma.$transaction([
+        prisma.chatMessage.create({ data: { documentId: doc.id, role: "user", content: question } }),
+        prisma.chatMessage.create({ data: { documentId: doc.id, role: "assistant", content: answer, sources: [] } }),
+      ]);
+      send("done", { messageId: saved.id, model: null, stopReason: "no_relevant_context" });
+      return;
+    }
 
     // Generate, moving to the next model if one is rate-limited or down.
     let answer = "";

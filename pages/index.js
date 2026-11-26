@@ -5,7 +5,7 @@ import Layout from "../components/Layout";
 import PdfUploader from "../components/PdfUploader";
 import PipelineSteps from "../components/PipelineSteps";
 import DocumentCard from "../components/DocumentCard";
-import { fetchJSON } from "../lib/client";
+import { fetchJSON } from "../utils/client";
 
 const IDLE = { active: -1, activeTo: undefined, failedAt: -1 };
 
@@ -39,6 +39,22 @@ export default function HomePage() {
       const form = new FormData();
       form.append("file", file);
       const uploaded = await fetchJSON("/api/upload", { method: "POST", body: form });
+
+      // Same PDF uploaded before and still indexed: reuse its stored embeddings.
+      const doc = uploaded.document;
+      if (uploaded.duplicate && doc.status === "READY" && !doc.needsReindex) {
+        setSteps({ active: 5, activeTo: 4, failedAt: -1 });
+        setStatus("");
+        setResult({
+          document: doc,
+          reused: true,
+          stats: { chunks: doc.chunkCount, dimensions: 1536 },
+          timings: { chunkMs: 0, embedMs: 0, storeMs: 0 },
+          extractMs: 0,
+        });
+        loadRecent();
+        return;
+      }
 
       // Steps 3-5: chunk + embed + store (one request)
       stage = 2;
@@ -87,6 +103,11 @@ export default function HomePage() {
           <div className="result">
             <div className="result-text">
               <h3>“{result.document.title}” is ready</h3>
+              {result.reused && (
+                <p className="subtle small reused-note">
+                  You uploaded this PDF before, so its stored embeddings were reused (no new API calls).
+                </p>
+              )}
               <dl className="stats">
                 <div><dt>Pages</dt><dd>{result.document.pageCount}</dd></div>
                 <div><dt>Chunks</dt><dd>{result.stats.chunks}</dd></div>

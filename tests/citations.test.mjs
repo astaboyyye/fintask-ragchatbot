@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { linkCitations, shortModel } from "../lib/citations.js";
+import { linkCitations, shortModel } from "../utils/citations.js";
 
 test("citations for retrieved sources become badge links", () => {
   assert.equal(linkCitations("Ratio is 21.4% [1][3].", 5), "Ratio is 21.4% [1](#cite-1)[3](#cite-3).");

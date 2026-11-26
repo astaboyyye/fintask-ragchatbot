@@ -5,7 +5,7 @@ import Layout from "../../components/Layout";
 import ChatMessage from "../../components/ChatMessage";
 import ChunkSourceList from "../../components/ChunkSourceList";
 import PipelineSteps from "../../components/PipelineSteps";
-import { fetchJSON, streamChat } from "../../lib/client";
+import { fetchJSON, streamChat } from "../../utils/client";
 
 const SUGGESTIONS = [
   "Summarize this document in five bullet points.",

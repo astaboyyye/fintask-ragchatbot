@@ -1,6 +1,6 @@
 import { prisma } from "../../../lib/db";
-import { getOwner } from "../../../lib/owner";
-import { allowMethods, publicDocumentSelect, sendError, withIndexState } from "../../../lib/api";
+import { getOwner } from "../../../utils/owner";
+import { allowMethods, publicDocumentSelect, sendError, withIndexState } from "../../../utils/api";
 import { EMBEDDING_MODEL } from "../../../lib/embedder";
 
 /**

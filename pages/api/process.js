@@ -3,8 +3,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/db";
 import { chunkPages, CHUNK_OVERLAP, CHUNK_SIZE } from "../../lib/chunker";
 import { embedTexts, toPgVector, EMBEDDING_MODEL } from "../../lib/embedder";
-import { getOwner } from "../../lib/owner";
-import { allowMethods, publicDocumentSelect, sendError } from "../../lib/api";
+import { getOwner } from "../../utils/owner";
+import { allowMethods, publicDocumentSelect, sendError } from "../../utils/api";
 
 export const config = { maxDuration: 300 };
 

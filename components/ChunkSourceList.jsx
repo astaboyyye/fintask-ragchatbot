@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { pageLabel } from "../lib/client";
+import { pageLabel } from "../utils/client";
 
 /** The top-k retrieved chunks for an answer, with page range and cosine score. */
 export default function ChunkSourceList({ sources = [], active, onSelect }) {

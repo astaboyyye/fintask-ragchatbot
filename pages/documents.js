@@ -2,7 +2,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Layout from "../components/Layout";
 import DocumentCard from "../components/DocumentCard";
-import { fetchJSON } from "../lib/client";
+import { fetchJSON } from "../utils/client";
 
 export default function DocumentsPage() {
   const [docs, setDocs] = useState(null);

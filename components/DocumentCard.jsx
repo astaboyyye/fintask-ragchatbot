@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatBytes, formatDate } from "../lib/client";
+import { formatBytes, formatDate } from "../utils/client";
 
 const STATUS_LABEL = {
   UPLOADED: "Waiting",

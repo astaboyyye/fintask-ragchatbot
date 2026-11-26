@@ -1,56 +1,41 @@
-import fs from "fs/promises";
-import formidable from "formidable";
 import { prisma } from "../../lib/db";
-import { extractPdf } from "../../lib/pdf";
-import { getOwner } from "../../lib/owner";
-import { allowMethods, publicDocumentSelect, sendError } from "../../lib/api";
-
-// Vercel caps serverless request bodies at 4.5 MB.
-export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
+import { readPdfUpload, extractPdf, contentHash, UploadError } from "../../lib/pdf";
+import { EMBEDDING_MODEL } from "../../lib/embedder";
+import { getOwner } from "../../utils/owner";
+import { allowMethods, publicDocumentSelect, sendError, withIndexState } from "../../utils/api";
 
 export const config = {
-  api: { bodyParser: false },
+  api: { bodyParser: false }, // formidable reads the multipart body itself
   maxDuration: 60,
 };
 
 /**
- * Steps 1-2 of the pipeline: receive the PDF and extract its text.
+ * Steps 1-2 of the pipeline: receive the PDF, validate it, extract its text.
  * POST multipart/form-data with a `file` field.
+ *
+ * Re-uploading a PDF this visitor already has returns the existing document
+ * (`duplicate: true`), so its stored embeddings are reused instead of paying
+ * for them again.
  */
 export default async function handler(req, res) {
   if (!allowMethods(req, res, ["POST"])) return;
   const owner = await getOwner(req, res);
 
-  const form = formidable({ maxFiles: 1, maxFileSize: MAX_UPLOAD_BYTES, allowEmptyFiles: false });
-  let file;
   try {
-    const [, files] = await form.parse(req);
-    file = Array.isArray(files.file) ? files.file[0] : files.file;
-  } catch (err) {
-    const tooBig = err?.httpCode === 413 || /maxFileSize/i.test(err?.message || "");
-    return sendError(res, tooBig ? 413 : 400, tooBig ? "PDF is larger than 4 MB." : "Could not read the upload.");
-  }
-  if (!file) return sendError(res, 400, "No file uploaded. Send the PDF in a `file` field.");
+    const { buffer, fileName } = await readPdfUpload(req);
+    const hash = contentHash(buffer);
 
-  try {
-    const buffer = await fs.readFile(file.filepath);
-    if (buffer.subarray(0, 5).toString("latin1") !== "%PDF-") {
-      return sendError(res, 415, "That file is not a PDF.");
+    const existing = await prisma.document.findFirst({
+      where: { ownerId: owner.id, contentHash: hash },
+      orderBy: { createdAt: "desc" },
+      select: publicDocumentSelect,
+    });
+    if (existing) {
+      return res.status(200).json({ document: withIndexState(existing, EMBEDDING_MODEL), duplicate: true, timings: { extractMs: 0 } });
     }
 
     const started = Date.now();
-    let extracted;
-    try {
-      extracted = await extractPdf(buffer);
-    } catch (err) {
-      return sendError(res, 422, "Could not parse this PDF. It may be encrypted or damaged.", err);
-    }
-    const charCount = extracted.pages.reduce((n, p) => n + p.length, 0);
-    if (charCount < 20) {
-      return sendError(res, 422, "No selectable text found. Scanned PDFs need OCR before they can be used.");
-    }
-
-    const fileName = (file.originalFilename || "document.pdf").slice(0, 200);
+    const extracted = await extractPdf(buffer);
     const title = (extracted.title || fileName.replace(/\.pdf$/i, "")).slice(0, 200);
 
     const document = await prisma.document.create({
@@ -59,17 +44,17 @@ export default async function handler(req, res) {
         title,
         fileName,
         fileSize: buffer.length,
+        contentHash: hash,
         pageCount: extracted.pageCount,
-        charCount,
+        charCount: extracted.charCount,
         pages: extracted.pages,
       },
       select: publicDocumentSelect,
     });
 
-    res.status(201).json({ document, timings: { extractMs: Date.now() - started } });
+    res.status(201).json({ document, duplicate: false, timings: { extractMs: Date.now() - started } });
   } catch (err) {
+    if (err instanceof UploadError) return sendError(res, err.status, err.message);
     sendError(res, 500, "Upload failed.", err);
-  } finally {
-    fs.unlink(file.filepath).catch(() => {});
   }
 }

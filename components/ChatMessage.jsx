@@ -1,7 +1,7 @@
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { pageLabel } from "../lib/client";
-import { linkCitations, shortModel } from "../lib/citations";
+import { pageLabel } from "../utils/client";
+import { linkCitations, shortModel } from "../utils/citations";
 
 export default function ChatMessage({ role, content, sources = [], streaming = false, model, onCite, activeCite }) {
   if (role === "user") {
