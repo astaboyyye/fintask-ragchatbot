@@ -115,7 +115,7 @@ export default async function handler(req, res) {
   } catch (err) {
     if (!clientGone) {
       console.error("Chat failed", err);
-      const message = err?.message?.includes("OPENAI_API_KEY")
+      const message = err?.message?.startsWith("No embeddings API key")
         ? err.message
         : describeClaudeError(err);
       send("error", { message });

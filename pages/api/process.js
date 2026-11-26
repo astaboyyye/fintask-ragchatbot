@@ -81,11 +81,13 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("Processing failed", err);
-    const message = err?.message?.includes("OPENAI_API_KEY")
+    const message = err?.message?.startsWith("No embeddings API key")
       ? err.message
       : err?.status === 401
-        ? "The OpenAI API key is invalid."
-        : "Processing failed while creating embeddings. Try again.";
+        ? "The embeddings API key is invalid."
+        : err?.status === 402
+          ? "The AI provider account is out of credits. Add credits and try again."
+          : "Processing failed while creating embeddings. Try again.";
     await prisma.document
       .update({ where: { id: doc.id }, data: { status: "FAILED", error: message } })
       .catch(() => {});

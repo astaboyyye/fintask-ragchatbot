@@ -5,7 +5,7 @@ token chunks, embeds each chunk into Postgres with **pgvector**, retrieves the 5
 your question by **cosine similarity**, and has **Claude** stream a grounded answer over
 **Server-Sent Events**, citing the passages (with page numbers) it used.
 
-Built with Next.js (pages router), Prisma + PostgreSQL/pgvector, OpenAI embeddings and the Anthropic SDK.
+Built with Next.js (pages router), Prisma + PostgreSQL/pgvector, OpenAI embeddings and the Anthropic SDK (directly or through OpenRouter).
 
 ## The RAG pipeline
 
@@ -52,11 +52,12 @@ flowchart LR
 ## Run it locally
 
 Requirements: Node.js 20.16+ (or 22.3+), a Postgres database with the `vector` extension
-(a free [Neon](https://neon.tech) project works), an Anthropic API key and an OpenAI API key.
+(a free [Neon](https://neon.tech) project works), and either one [OpenRouter](https://openrouter.ai) key
+or an Anthropic key plus an OpenAI key.
 
 ```bash
 npm install
-cp .env.example .env          # fill in DATABASE_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY
+cp .env.example .env          # fill in DATABASE_URL and the API key(s)
 npx prisma migrate deploy     # creates the tables and enables pgvector
 npm run dev                   # http://localhost:3000
 ```
@@ -70,7 +71,7 @@ npm test
 ## Deploy to Vercel
 
 1. Push this repo to GitHub and import it in Vercel.
-2. Add the environment variables from `.env.example` (at minimum `DATABASE_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
+2. Add the environment variables from `.env.example` (at minimum `DATABASE_URL` and `OPENROUTER_API_KEY`, or `ANTHROPIC_API_KEY` + `OPENAI_API_KEY`).
 3. Deploy. The `vercel-build` script runs `prisma generate`, then `prisma migrate deploy`, then `next build`, so the database schema is applied on every deploy.
 
 Vercel limits request bodies to 4.5 MB, which is why uploads are capped at 4 MB.
@@ -80,9 +81,10 @@ Vercel limits request bodies to 4.5 MB, which is why uploads are capped at 4 MB.
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | Postgres connection string (pgvector must be available) |
-| `ANTHROPIC_API_KEY` | yes | Claude, for answers |
-| `OPENAI_API_KEY` | yes | Embeddings |
-| `CLAUDE_MODEL` | no | Defaults to `claude-opus-5-5` |
+| `OPENROUTER_API_KEY` | one of these | Claude (through OpenRouter's Anthropic-compatible endpoint) **and** embeddings (`openai/text-embedding-3-small`). An `sk-or-` key in `ANTHROPIC_API_KEY` is also recognised |
+| `ANTHROPIC_API_KEY` | one of these | Claude directly, for answers; takes priority over OpenRouter |
+| `OPENAI_API_KEY` | one of these | Embeddings directly; takes priority over OpenRouter |
+| `CLAUDE_MODEL` | no | Defaults to `claude-opus-5-5` (direct) or `anthropic/claude-opus-5.5` (OpenRouter) |
 | `CLAUDE_EFFORT` | no | `low` (default, fastest), `medium` or `high` |
 | `EMBEDDING_MODEL` | no | Defaults to `text-embedding-3-small` (must return 1536 dims) |
 | `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `GITHUB_ID`, `GITHUB_SECRET` | no | Turn on GitHub sign-in |
@@ -103,14 +105,15 @@ Vercel limits request bodies to 4.5 MB, which is why uploads are capped at 4 MB.
 - **Exact search, scoped per document.** Retrieval filters to one document, so Postgres uses the `(documentId, index)` index and ranks that document's chunks exactly. An approximate HNSW index combined with a `WHERE` filter can return fewer than 5 rows. HNSW is only worth adding for search across many documents (see `sql/enable-pgvector.sql`).
 - **Page-aware chunks.** Text is extracted page by page and every token keeps its page number, so a citation can say "pp. 4–5" even when a chunk crosses a page break.
 - **Grounding.** The system prompt tells Claude to answer from the retrieved passages, cite them, and say when the document doesn't cover the question rather than guess.
-- **Model fallback.** Requests opt into the API's server-side fallback (`fallbacks: "default"`). If the primary model declines mid-answer, the client gets a `reset` event and the fallback model's answer replaces the partial text.
+- **Providers.** `lib/providers.js` picks the endpoints from the keys present: direct Anthropic/OpenAI keys, or a single OpenRouter key for both. The code always uses the official Anthropic SDK for Claude; with OpenRouter it only changes the base URL.
+- **Model fallback.** On the direct Anthropic API, requests opt into server-side fallback (`fallbacks: "default"`). If the primary model declines mid-answer, the client gets a `reset` event and the fallback model's answer replaces the partial text. OpenRouter doesn't accept this parameter, so it isn't sent there.
 - **Two-request ingestion.** Upload + extract and chunk + embed + store are separate requests. Each step stays well inside serverless time limits, and a failed embedding run can be retried without re-uploading.
 
 ## Project structure
 
 ```
 components/   ChatMessage, ChunkSourceList, DocumentCard, Layout, PdfUploader, PipelineSteps
-lib/          pdf, chunker, embedder, vectorSearch, claudeRAG, db, owner, auth, client
+lib/          pdf, chunker, embedder, vectorSearch, claudeRAG, providers, db, owner, auth, client
 pages/        index (upload), documents, chat/[docId], api/*
 prisma/       schema.prisma, migrations/
 sql/          enable-pgvector.sql
